@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: habitpulse
+      POSTGRES_USER: habitpulse
+      POSTGRES_PASSWORD: habitpulse
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U habitpulse -d habitpulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: python:3.12-slim
+    working_dir: /app
+    command: sh -c "pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      DATABASE_URL: postgresql://habitpulse:habitpulse@db:5432/habitpulse
+      SECRET_KEY: replace-with-a-long-random-secret
+      CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    volumes:
+      - ./frontend:/app
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_SUPABASE_URL: https://your-project.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: your-supabase-anon-key
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_replace_me
+      CLERK_SECRET_KEY: sk_test_replace_me
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
